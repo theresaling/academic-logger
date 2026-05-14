@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Academic Practice Logger - Entry</title>
+    <meta name="theme-color" content="#cb7a4f" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./pwa/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Academic Practice Logger</p>
+        <h1>Entry</h1>
+        <p class="subtitle">
+          Date auto-fills each time. You can still edit it, and voice can auto-detect subject/duration when spoken clearly.
+        </p>
+      </div>
+      <nav class="future-card top-nav">
+        <a class="nav-link active" href="./entry.html">Entry</a>
+        <a class="nav-link" href="./dashboard.html">Dashboard</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <h2>Add Entry</h2>
+        <form id="entry-form" class="stack">
+          <div class="field-grid">
+            <label>
+              Date (auto)
+              <input type="date" id="entry-date" required />
+            </label>
+            <label>
+              Subject
+              <div class="subject-row">
+                <div id="entry-subject-custom" class="custom-select">
+                  <button type="button" id="entry-subject-trigger" class="custom-select-trigger"></button>
+                  <div id="entry-subject-menu" class="custom-select-menu hidden" role="listbox"></div>
+                  <select id="entry-subject" required class="sr-only-select"></select>
+                </div>
+                <input type="text" id="new-subject" placeholder="Add subject" aria-label="New subject name" />
+                <button type="button" id="add-subject-btn" class="secondary">Add</button>
+              </div>
+            </label>
+            <label>
+              Duration (minutes)
+              <div id="entry-duration-custom" class="custom-select">
+                <button type="button" id="entry-duration-trigger" class="custom-select-trigger"></button>
+                <div id="entry-duration-menu" class="custom-select-menu hidden" role="listbox"></div>
+                <select id="entry-duration" required class="sr-only-select">
+                  <option value="10">10 min</option>
+                  <option value="20">20 min</option>
+                  <option value="30" selected>30 min</option>
+                  <option value="40">40 min</option>
+                  <option value="50">50 min</option>
+                  <option value="60">60 min</option>
+                </select>
+              </div>
+            </label>
+          </div>
+
+          <label>
+            Notes
+            <textarea
+              id="entry-notes"
+              rows="5"
+              placeholder="Try: Subject is Math for 45 minutes. Then dictate details; they will be converted to concise bullets."
+            ></textarea>
+          </label>
+
+          <div class="toolbar">
+            <button type="button" id="voice-btn" class="secondary">Start Voice Note</button>
+            <button type="button" id="detect-fields-btn" class="secondary">Detect Subject/Duration</button>
+            <span id="voice-status" aria-live="polite">Voice input idle.</span>
+          </div>
+          <div id="voice-detected-preview" class="detected-preview hidden" aria-live="polite"></div>
+
+          <label>
+            Photo attachment
+            <input type="file" id="entry-photo" accept="image/*" />
+          </label>
+          <div id="photo-preview" class="photo-preview empty">No photo selected.</div>
+
+          <div class="actions">
+            <button type="submit">Save Entry</button>
+            <button type="button" id="reset-entry-btn" class="secondary">Clear</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>Entries</h2>
+        <div id="entries-list" class="entries-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>External Learning Links</h2>
+        <form id="link-form" class="stack compact">
+          <div class="field-grid two-col">
+            <label>
+              Name
+              <input type="text" id="link-name" placeholder="Beast Academy" required />
+            </label>
+            <label>
+              URL
+              <input type="url" id="link-url" placeholder="https://example.com" required />
+            </label>
+          </div>
+          <label>
+            Notes
+            <textarea id="link-notes" rows="3" placeholder="What is this used for?"></textarea>
+          </label>
+          <div class="actions">
+            <button type="submit">Save Link</button>
+          </div>
+        </form>
+        <div id="links-list" class="entries-list"></div>
+      </section>
+
+      <section class="card">
+        <h2>Backup &amp; Restore</h2>
+        <p class="subtitle">
+          Export a JSON backup to your Files/iCloud/Drive, then import it on another device. This keeps the app
+          local-first without requiring accounts.
+        </p>
+        <div class="toolbar">
+          <button type="button" id="export-data-btn" class="secondary">Export backup</button>
+          <label class="file-import secondary">
+            Import backup
+            <input type="file" id="import-data-file" accept="application/json" />
+          </label>
+        </div>
+        <p id="backup-status" class="subtitle" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <template id="entry-template">
+      <article class="entry-card">
+        <div class="entry-header">
+          <div>
+            <h3 class="entry-title"></h3>
+            <p class="entry-meta"></p>
+          </div>
+          <div class="entry-actions">
+            <button type="button" data-action="edit" class="secondary small">Edit</button>
+            <button type="button" data-action="delete" class="secondary small danger">Delete</button>
+          </div>
+        </div>
+        <p class="entry-notes"></p>
+        <img class="entry-photo hidden" alt="Entry attachment preview" />
+      </article>
+    </template>
+
+    <template id="link-template">
+      <article class="entry-card">
+        <div class="entry-header">
+          <div>
+            <h3 class="entry-title"></h3>
+            <p class="entry-meta"></p>
+          </div>
+          <button type="button" data-action="delete-link" class="secondary small danger">Delete</button>
+        </div>
+        <p class="entry-notes"></p>
+      </article>
+    </template>
+
+    <script type="module" src="./entry.js"></script>
+    <script type="module">
+      import { registerServiceWorker } from "./pwa/pwa.js";
+      registerServiceWorker();
+    </script>
+  </body>
+</html>

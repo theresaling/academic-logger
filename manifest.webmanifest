@@ -1,0 +1,19 @@
+{
+  "name": "Academic Practice Logger",
+  "short_name": "Academic Logger",
+  "description": "Local-first academic practice logger for lessons, practice sessions, and reference links.",
+  "start_url": "./entry.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fdf8f3",
+  "theme_color": "#cb7a4f",
+  "icons": [
+    {
+      "src": "./pwa/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
+

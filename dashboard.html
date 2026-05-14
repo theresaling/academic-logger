@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Academic Practice Logger - Dashboard</title>
+    <meta name="theme-color" content="#cb7a4f" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./pwa/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Academic Practice Logger</p>
+        <h1>Dashboard</h1>
+        <p class="subtitle">Review time totals, subject breakdowns, and notes by selected period.</p>
+      </div>
+      <nav class="future-card top-nav">
+        <a class="nav-link" href="./entry.html">Entry</a>
+        <a class="nav-link active" href="./dashboard.html">Dashboard</a>
+      </nav>
+    </header>
+
+    <main class="layout">
+      <section class="card">
+        <h2>Filters</h2>
+        <div class="field-grid">
+          <label>
+            Period
+            <select id="period-filter">
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+              <option value="month" selected>Month</option>
+              <option value="year">Year</option>
+            </select>
+          </label>
+          <label>
+            Anchor date
+            <input type="date" id="anchor-date" />
+          </label>
+          <label>
+            Subject filter
+            <div id="dashboard-subject-custom" class="custom-select">
+              <button type="button" id="dashboard-subject-trigger" class="custom-select-trigger"></button>
+              <div id="dashboard-subject-menu" class="custom-select-menu hidden" role="listbox"></div>
+              <select id="subject-filter" class="sr-only-select">
+                <option value="">All subjects</option>
+              </select>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Summary</h2>
+        <div class="summary-grid">
+          <article class="summary-tile">
+            <span class="summary-label">Total minutes</span>
+            <strong id="total-minutes">0</strong>
+          </article>
+          <article class="summary-tile">
+            <span class="summary-label">Entries</span>
+            <strong id="entry-count">0</strong>
+          </article>
+          <article class="summary-tile">
+            <span class="summary-label">Subjects</span>
+            <strong id="subject-count">0</strong>
+          </article>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="dash-columns">
+          <div>
+            <h3>Subject Rollup</h3>
+            <ul id="subject-rollup" class="list"></ul>
+          </div>
+          <div>
+            <h3>Notes in Period</h3>
+            <ul id="notes-rollup" class="list notes-list"></ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./dashboard.js"></script>
+    <script type="module">
+      import { registerServiceWorker } from "./pwa/pwa.js";
+      registerServiceWorker();
+    </script>
+  </body>
+</html>
