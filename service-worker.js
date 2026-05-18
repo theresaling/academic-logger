@@ -1,4 +1,4 @@
-const CACHE_NAME = "academic-logger-v1";
+const CACHE_NAME = "academic-logger-v2";
 
 const APP_SHELL = [
   "./",
@@ -48,24 +48,23 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-
-      return fetch(request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
-          return response;
-        })
-        .catch(() => {
+    fetch(request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+        return response;
+      })
+      .catch(() =>
+        caches.match(request).then((cached) => {
+          if (cached) {
+            return cached;
+          }
           if (request.mode === "navigate") {
             return caches.match("./entry.html");
           }
           return new Response("Offline", { status: 503, statusText: "Offline" });
-        });
-    })
+        })
+      )
   );
 });
 
