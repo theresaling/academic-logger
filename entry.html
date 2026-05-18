@@ -67,14 +67,16 @@
             <textarea
               id="entry-notes"
               rows="5"
-              placeholder="Try: Subject is Math for 45 minutes. Then dictate details; they will be converted to concise bullets."
+              placeholder="Try: Math for 45 minutes — worked on fractions, struggled with mixed numbers."
             ></textarea>
           </label>
+          <p class="subtitle">
+            Tap and dictate with your keyboard (Superwhisper, system mic, or type). Subject and duration auto-fill as you mention them.
+          </p>
 
           <div class="toolbar">
-            <button type="button" id="voice-btn" class="secondary">Start Voice Note</button>
-            <button type="button" id="detect-fields-btn" class="secondary">Detect Subject/Duration</button>
-            <span id="voice-status" aria-live="polite">Voice input idle.</span>
+            <button type="button" id="detect-fields-btn" class="secondary">Tidy notes</button>
+            <span id="voice-status" aria-live="polite">Ready.</span>
           </div>
           <div id="voice-detected-preview" class="detected-preview hidden" aria-live="polite"></div>
 

@@ -16,8 +16,9 @@ const state = {
   links: loadJson(STORAGE_KEYS.links, []),
   editingEntryId: null,
   photoDataUrl: null,
-  recognition: null,
 };
+
+let autoDetectTimer = null;
 
 const elements = {
   entryForm: document.querySelector("#entry-form"),
@@ -36,7 +37,6 @@ const elements = {
   entryPhoto: document.querySelector("#entry-photo"),
   photoPreview: document.querySelector("#photo-preview"),
   resetEntryBtn: document.querySelector("#reset-entry-btn"),
-  voiceBtn: document.querySelector("#voice-btn"),
   detectFieldsBtn: document.querySelector("#detect-fields-btn"),
   voiceStatus: document.querySelector("#voice-status"),
   voiceDetectedPreview: document.querySelector("#voice-detected-preview"),
@@ -58,7 +58,6 @@ init();
 function init() {
   elements.entryDate.value = todayIso();
   bindEvents();
-  setupVoiceInput();
   setupCustomSelectInteractions();
   renderSubjects();
   renderDurationCustomSelect();
@@ -75,6 +74,7 @@ function bindEvents() {
   elements.entryPhoto.addEventListener("change", handlePhotoInput);
   elements.resetEntryBtn.addEventListener("click", resetEntryForm);
   elements.detectFieldsBtn.addEventListener("click", handleDetectFromNotes);
+  elements.entryNotes.addEventListener("input", scheduleAutoDetect);
   elements.entryNotes.addEventListener("paste", handleDeferredNotesDetection);
   elements.linkForm.addEventListener("submit", handleLinkSubmit);
   elements.entriesList.addEventListener("click", handleEntryListClick);
@@ -225,50 +225,30 @@ function setupCustomSelectInteractions() {
   });
 }
 
-function setupVoiceInput() {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SpeechRecognition) {
-    elements.voiceBtn.disabled = true;
-    elements.voiceStatus.textContent = "Voice input is not supported in this browser.";
+function scheduleAutoDetect() {
+  if (autoDetectTimer) {
+    clearTimeout(autoDetectTimer);
+  }
+  autoDetectTimer = window.setTimeout(autoDetectFromNotes, 400);
+}
+
+function autoDetectFromNotes() {
+  const transcript = elements.entryNotes.value.trim();
+  if (!transcript) {
+    clearDetectedPreview();
     return;
   }
-
-  const recognition = new SpeechRecognition();
-  recognition.lang = "en-US";
-  recognition.interimResults = false;
-  recognition.maxAlternatives = 1;
-
-  recognition.onstart = () => {
-    elements.voiceStatus.textContent = "Listening...";
-    elements.voiceBtn.textContent = "Listening...";
-  };
-
-  recognition.onresult = (event) => {
-    const transcript = event.results[0][0].transcript.trim();
-    const extracted = extractEntryFieldsFromTranscript(transcript);
-    const applied = applyExtractedFields(extracted);
-    const conciseVoiceText = buildConciseVoiceNotes(extracted.scrubbedText);
-    if (conciseVoiceText) {
-      elements.entryNotes.value = [elements.entryNotes.value.trim(), conciseVoiceText]
-        .filter(Boolean)
-        .join("\n");
-    }
-    const subject = elements.entrySubject.value || "Unspecified subject";
-    const duration = Number(elements.entryDuration.value) || 0;
-    elements.voiceStatus.textContent = buildVoiceStatusMessage(extracted, subject, duration);
-    renderDetectedPreview(applied);
-  };
-
-  recognition.onerror = () => {
-    elements.voiceStatus.textContent = "Voice input failed. You can type notes instead.";
-  };
-
-  recognition.onend = () => {
-    elements.voiceBtn.textContent = "Start Voice Note";
-  };
-
-  state.recognition = recognition;
-  elements.voiceBtn.addEventListener("click", () => recognition.start());
+  const extracted = extractEntryFieldsFromTranscript(transcript);
+  const applied = applyExtractedFields(extracted);
+  if (!applied.subject && !applied.duration) {
+    return;
+  }
+  elements.voiceStatus.textContent = buildVoiceStatusMessage(
+    extracted,
+    elements.entrySubject.value || "Unspecified subject",
+    Number(elements.entryDuration.value) || 0
+  );
+  renderDetectedPreview(applied);
 }
 
 function handleAddSubject() {
@@ -453,7 +433,7 @@ function resetEntryForm() {
   renderPhotoPreview();
   renderSubjects();
   elements.entryDuration.value = "30";
-  elements.voiceStatus.textContent = "Voice input idle.";
+  elements.voiceStatus.textContent = "Ready.";
   clearDetectedPreview();
   renderDurationCustomSelect();
   clearDraft();
