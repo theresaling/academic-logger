@@ -67,18 +67,23 @@
             <textarea
               id="entry-notes"
               rows="5"
-              placeholder="Try: Math for 45 minutes — worked on fractions, struggled with mixed numbers."
+              placeholder="Try: Subject is Math for 45 minutes. Then dictate details; they will be converted to concise bullets."
             ></textarea>
           </label>
-          <p class="subtitle">
-            Tap and dictate with your keyboard (Superwhisper, system mic, or type). Subject and duration auto-fill as you mention them.
-          </p>
 
           <div class="toolbar">
-            <button type="button" id="detect-fields-btn" class="secondary">Tidy notes</button>
-            <span id="voice-status" aria-live="polite">Ready.</span>
+            <button type="button" id="voice-btn" class="secondary">Start Voice Note</button>
+            <button type="button" id="detect-fields-btn" class="secondary">Detect Subject/Duration</button>
+            <span id="voice-status" aria-live="polite">Voice input idle.</span>
           </div>
           <div id="voice-detected-preview" class="detected-preview hidden" aria-live="polite"></div>
+          <div id="subject-confirm-prompt" class="subject-confirm-prompt hidden" aria-live="polite">
+            <span class="subject-confirm-message"></span>
+            <div class="subject-confirm-actions">
+              <button type="button" id="subject-confirm-add" class="small">Add</button>
+              <button type="button" id="subject-confirm-skip" class="secondary small">Skip</button>
+            </div>
+          </div>
 
           <label>
             Photo attachment

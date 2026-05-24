@@ -279,6 +279,59 @@ p {
   background: #fff4ea;
 }
 
+.custom-select-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.custom-select-option-row .custom-select-option {
+  flex: 1;
+}
+
+.custom-select-option-remove {
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--muted);
+  border: 0;
+  border-radius: 8px;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 400;
+}
+
+.custom-select-option-remove:hover,
+.custom-select-option-remove:focus-visible {
+  background: #fde2e2;
+  color: var(--danger);
+}
+
+.subject-confirm-prompt {
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 14px;
+  padding: 0.7rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.94rem;
+}
+
+.subject-confirm-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex: 0 0 auto;
+}
+
+.subject-confirm-prompt button.small {
+  padding: 0.45rem 0.85rem;
+  min-height: 36px;
+}
+
 .sr-only-select {
   position: absolute;
   opacity: 0;

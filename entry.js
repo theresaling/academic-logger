@@ -16,9 +16,10 @@ const state = {
   links: loadJson(STORAGE_KEYS.links, []),
   editingEntryId: null,
   photoDataUrl: null,
+  recognition: null,
+  pendingSubjectCandidate: null,
+  lastTidiedNotesValue: null,
 };
-
-let autoDetectTimer = null;
 
 const elements = {
   entryForm: document.querySelector("#entry-form"),
@@ -37,9 +38,14 @@ const elements = {
   entryPhoto: document.querySelector("#entry-photo"),
   photoPreview: document.querySelector("#photo-preview"),
   resetEntryBtn: document.querySelector("#reset-entry-btn"),
+  voiceBtn: document.querySelector("#voice-btn"),
   detectFieldsBtn: document.querySelector("#detect-fields-btn"),
   voiceStatus: document.querySelector("#voice-status"),
   voiceDetectedPreview: document.querySelector("#voice-detected-preview"),
+  subjectConfirmPrompt: document.querySelector("#subject-confirm-prompt"),
+  subjectConfirmMessage: document.querySelector("#subject-confirm-prompt .subject-confirm-message"),
+  subjectConfirmAdd: document.querySelector("#subject-confirm-add"),
+  subjectConfirmSkip: document.querySelector("#subject-confirm-skip"),
   entriesList: document.querySelector("#entries-list"),
   entryTemplate: document.querySelector("#entry-template"),
   linkForm: document.querySelector("#link-form"),
@@ -58,6 +64,7 @@ init();
 function init() {
   elements.entryDate.value = todayIso();
   bindEvents();
+  setupVoiceInput();
   setupCustomSelectInteractions();
   renderSubjects();
   renderDurationCustomSelect();
@@ -74,8 +81,9 @@ function bindEvents() {
   elements.entryPhoto.addEventListener("change", handlePhotoInput);
   elements.resetEntryBtn.addEventListener("click", resetEntryForm);
   elements.detectFieldsBtn.addEventListener("click", handleDetectFromNotes);
-  elements.entryNotes.addEventListener("input", scheduleAutoDetect);
   elements.entryNotes.addEventListener("paste", handleDeferredNotesDetection);
+  elements.subjectConfirmAdd.addEventListener("click", handleSubjectConfirmAdd);
+  elements.subjectConfirmSkip.addEventListener("click", handleSubjectConfirmSkip);
   elements.linkForm.addEventListener("submit", handleLinkSubmit);
   elements.entriesList.addEventListener("click", handleEntryListClick);
   elements.linksList.addEventListener("click", handleLinksListClick);
@@ -225,30 +233,50 @@ function setupCustomSelectInteractions() {
   });
 }
 
-function scheduleAutoDetect() {
-  if (autoDetectTimer) {
-    clearTimeout(autoDetectTimer);
+function setupVoiceInput() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    elements.voiceBtn.disabled = true;
+    elements.voiceStatus.textContent = "Voice input is not supported in this browser.";
+    return;
   }
-  autoDetectTimer = window.setTimeout(autoDetectFromNotes, 400);
-}
 
-function autoDetectFromNotes() {
-  const transcript = elements.entryNotes.value.trim();
-  if (!transcript) {
-    clearDetectedPreview();
-    return;
-  }
-  const extracted = extractEntryFieldsFromTranscript(transcript);
-  const applied = applyExtractedFields(extracted);
-  if (!applied.subject && !applied.duration) {
-    return;
-  }
-  elements.voiceStatus.textContent = buildVoiceStatusMessage(
-    extracted,
-    elements.entrySubject.value || "Unspecified subject",
-    Number(elements.entryDuration.value) || 0
-  );
-  renderDetectedPreview(applied);
+  const recognition = new SpeechRecognition();
+  recognition.lang = "en-US";
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onstart = () => {
+    elements.voiceStatus.textContent = "Listening...";
+    elements.voiceBtn.textContent = "Listening...";
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript.trim();
+    const extracted = extractEntryFieldsFromTranscript(transcript);
+    const applied = applyExtractedFields(extracted);
+    const conciseVoiceText = buildConciseVoiceNotes(extracted.scrubbedText);
+    if (conciseVoiceText) {
+      elements.entryNotes.value = [elements.entryNotes.value.trim(), conciseVoiceText]
+        .filter(Boolean)
+        .join("\n");
+    }
+    const subject = elements.entrySubject.value || "Unspecified subject";
+    const duration = Number(elements.entryDuration.value) || 0;
+    elements.voiceStatus.textContent = buildVoiceStatusMessage(extracted, subject, duration);
+    renderDetectedPreview(applied);
+  };
+
+  recognition.onerror = () => {
+    elements.voiceStatus.textContent = "Voice input failed. You can type notes instead.";
+  };
+
+  recognition.onend = () => {
+    elements.voiceBtn.textContent = "Start Voice Note";
+  };
+
+  state.recognition = recognition;
+  elements.voiceBtn.addEventListener("click", () => recognition.start());
 }
 
 function handleAddSubject() {
@@ -318,32 +346,46 @@ function handleDeferredNotesDetection() {
 }
 
 function handleDetectFromNotes() {
-  const transcript = elements.entryNotes.value.trim();
+  const currentValue = elements.entryNotes.value;
+  const transcript = currentValue.trim();
   if (!transcript) {
     clearDetectedPreview();
     return;
   }
 
-  const extracted = extractEntryFieldsFromTranscript(transcript);
-  const applied = applyExtractedFields(extracted);
-  if (applied.subject || applied.duration) {
-    const conciseNotes = buildConciseVoiceNotes(extracted.scrubbedText);
-    if (conciseNotes) {
-      elements.entryNotes.value = conciseNotes;
-    }
-  }
-  if (!applied.subject && !applied.duration) {
-    elements.voiceStatus.textContent =
-      "Could not detect subject/duration from notes text. Try 'Subject is Math for 45 minutes'.";
-    renderDetectedPreview(applied);
+  if (state.lastTidiedNotesValue !== null && currentValue === state.lastTidiedNotesValue) {
+    elements.voiceStatus.textContent = "Notes are already tidied. Edit them to re-tidy.";
     return;
   }
 
-  elements.voiceStatus.textContent = buildVoiceStatusMessage(
-    extracted,
-    elements.entrySubject.value || "Unspecified subject",
-    Number(elements.entryDuration.value) || 0
-  );
+  if (state.lastTidiedNotesValue !== null) {
+    const ok = window.confirm("Re-tidy these notes? This will reformat the current text.");
+    if (!ok) {
+      return;
+    }
+  }
+
+  const extracted = extractEntryFieldsFromTranscript(transcript);
+  const applied = applyExtractedFields(extracted);
+
+  const tidied = buildConciseVoiceNotes(transcript);
+  if (tidied && tidied !== currentValue) {
+    elements.entryNotes.value = tidied;
+    state.lastTidiedNotesValue = tidied;
+    saveDraft();
+  } else {
+    state.lastTidiedNotesValue = currentValue;
+  }
+
+  if (!applied.subject && !applied.duration && !applied.pendingSubject) {
+    elements.voiceStatus.textContent = "Notes tidied. Subject/duration not detected; fill them manually.";
+  } else {
+    elements.voiceStatus.textContent = buildVoiceStatusMessage(
+      extracted,
+      elements.entrySubject.value || "Unspecified subject",
+      Number(elements.entryDuration.value) || 0
+    );
+  }
   renderDetectedPreview(applied);
 }
 
@@ -427,14 +469,16 @@ function handleLinksListClick(event) {
 
 function resetEntryForm() {
   state.editingEntryId = null;
+  state.lastTidiedNotesValue = null;
   elements.entryForm.reset();
   elements.entryDate.value = todayIso();
   state.photoDataUrl = null;
   renderPhotoPreview();
   renderSubjects();
   elements.entryDuration.value = "30";
-  elements.voiceStatus.textContent = "Ready.";
+  elements.voiceStatus.textContent = "Voice input idle.";
   clearDetectedPreview();
+  hideSubjectConfirmPrompt();
   renderDurationCustomSelect();
   clearDraft();
 }
@@ -659,24 +703,18 @@ function sanitizeSubject(value) {
 }
 
 function applyExtractedFields(extracted) {
-  const applied = { subject: null, duration: null };
+  const applied = { subject: null, duration: null, pendingSubject: null };
   if (extracted.subject) {
-    const subjectExists = state.subjects.some(
+    const existing = state.subjects.find(
       (item) => item.toLowerCase() === extracted.subject.toLowerCase()
     );
-    if (!subjectExists) {
-      state.subjects.push(extracted.subject);
-      saveJson(STORAGE_KEYS.subjects, state.subjects);
-      renderSubjects();
-    }
-
-    const selected = state.subjects.find(
-      (item) => item.toLowerCase() === extracted.subject.toLowerCase()
-    );
-    if (selected) {
-      elements.entrySubject.value = selected;
-      applied.subject = selected;
+    if (existing) {
+      elements.entrySubject.value = existing;
+      applied.subject = existing;
       renderSubjectCustomSelect();
+    } else {
+      applied.pendingSubject = extracted.subject;
+      showSubjectConfirmPrompt(extracted.subject);
     }
   }
 
@@ -692,6 +730,43 @@ function applyExtractedFields(extracted) {
   }
 
   return applied;
+}
+
+function showSubjectConfirmPrompt(candidate) {
+  state.pendingSubjectCandidate = candidate;
+  elements.subjectConfirmMessage.textContent = `Add "${candidate}" as a new subject?`;
+  elements.subjectConfirmPrompt.classList.remove("hidden");
+}
+
+function hideSubjectConfirmPrompt() {
+  state.pendingSubjectCandidate = null;
+  elements.subjectConfirmPrompt.classList.add("hidden");
+  elements.subjectConfirmMessage.textContent = "";
+}
+
+function handleSubjectConfirmAdd() {
+  const candidate = state.pendingSubjectCandidate;
+  if (!candidate) {
+    hideSubjectConfirmPrompt();
+    return;
+  }
+  const existing = state.subjects.find(
+    (item) => item.toLowerCase() === candidate.toLowerCase()
+  );
+  if (!existing) {
+    state.subjects.push(candidate);
+    saveJson(STORAGE_KEYS.subjects, state.subjects);
+    renderSubjects();
+  }
+  const selected = existing || candidate;
+  elements.entrySubject.value = selected;
+  renderSubjectCustomSelect();
+  saveDraft();
+  hideSubjectConfirmPrompt();
+}
+
+function handleSubjectConfirmSkip() {
+  hideSubjectConfirmPrompt();
 }
 
 function buildVoiceStatusMessage(extracted, subject, duration) {
@@ -748,10 +823,6 @@ function scrubSubjectPhrases(text, subject) {
 }
 
 function buildConciseVoiceNotes(text) {
-  if (/^\s*[•-]\s+/m.test(text)) {
-    return text.trim();
-  }
-
   const cleaned = text
     .replace(/\r/g, "")
     .replace(/[ \t]+/g, " ")
@@ -764,12 +835,10 @@ function buildConciseVoiceNotes(text) {
 
   const segments = cleaned
     .split(/[\n]+|(?<=[.!?])\s+/)
-    .map((part) => part.trim())
+    .map((part) => part.trim().replace(/^[•\-]\s*/, "").trim())
     .filter(Boolean);
 
-  const bullets = segments
-    .slice(0, 6)
-    .map((segment) => `• ${sentenceCase(segment)}`);
+  const bullets = segments.map((segment) => `• ${sentenceCase(segment)}`);
 
   return bullets.join("\n");
 }
@@ -803,6 +872,9 @@ function renderSubjectCustomSelect() {
   const options = [...elements.entrySubject.options].map((option) => option.value);
   elements.entrySubjectMenu.innerHTML = "";
   options.forEach((subject) => {
+    const row = document.createElement("div");
+    row.className = "custom-select-option-row";
+
     const optionButton = document.createElement("button");
     optionButton.type = "button";
     optionButton.className = "custom-select-option";
@@ -816,7 +888,19 @@ function renderSubjectCustomSelect() {
       renderSubjectCustomSelect();
       saveDraft();
     });
-    elements.entrySubjectMenu.append(optionButton);
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "custom-select-option-remove";
+    removeButton.setAttribute("aria-label", `Remove ${subject}`);
+    removeButton.textContent = "×";
+    removeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handleRemoveSubject(subject);
+    });
+
+    row.append(optionButton, removeButton);
+    elements.entrySubjectMenu.append(row);
   });
 
   const selectedSubject = elements.entrySubject.value || options[0] || "Select subject";
@@ -826,6 +910,21 @@ function renderSubjectCustomSelect() {
   } else {
     elements.entrySubjectTrigger.textContent = "Select subject";
   }
+}
+
+function handleRemoveSubject(subject) {
+  const ok = window.confirm(
+    `Remove "${subject}" from the subject list?\n\nExisting entries with this subject won't be deleted.`
+  );
+  if (!ok) {
+    return;
+  }
+  state.subjects = state.subjects.filter((item) => item !== subject);
+  if (elements.entrySubject.value === subject) {
+    elements.entrySubject.value = state.subjects[0] || "";
+  }
+  renderSubjects();
+  saveDraft();
 }
 
 function renderDurationCustomSelect() {
