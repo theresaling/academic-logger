@@ -537,3 +537,12 @@ p {
     flex: 1;
   }
 }
+
+.save-error {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(183, 68, 87, 0.1);
+  color: var(--danger);
+  font-size: 0.9rem;
+}

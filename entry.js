@@ -38,6 +38,7 @@ const elements = {
   entryPhoto: document.querySelector("#entry-photo"),
   photoPreview: document.querySelector("#photo-preview"),
   resetEntryBtn: document.querySelector("#reset-entry-btn"),
+  saveError: document.querySelector("#save-error"),
   voiceBtn: document.querySelector("#voice-btn"),
   detectFieldsBtn: document.querySelector("#detect-fields-btn"),
   voiceStatus: document.querySelector("#voice-status"),
@@ -307,12 +308,45 @@ function handlePhotoInput(event) {
   }
 
   const reader = new FileReader();
-  reader.onload = () => {
-    state.photoDataUrl = reader.result;
+  reader.onload = async () => {
+    try {
+      state.photoDataUrl = await compressImageDataUrl(reader.result);
+    } catch {
+      // Image couldn't be decoded (e.g., HEIC on desktop). Fall back to the
+      // original so iOS still renders it; desktop will show a broken icon.
+      state.photoDataUrl = reader.result;
+    }
     renderPhotoPreview();
     saveDraft();
   };
   reader.readAsDataURL(file);
+}
+
+function compressImageDataUrl(dataUrl, maxDim = 1024, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const longest = Math.max(width, height);
+      if (longest > maxDim) {
+        const scale = maxDim / longest;
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, width, height);
+      try {
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => reject(new Error("decode-failed"));
+    img.src = dataUrl;
+  });
 }
 
 function handleEntrySubmit(event) {
@@ -328,15 +362,37 @@ function handleEntrySubmit(event) {
     createdAt: new Date().toISOString(),
   };
 
-  if (state.editingEntryId) {
-    state.entries = state.entries.map((item) => (item.id === entry.id ? entry : item));
-  } else {
-    state.entries.unshift(entry);
+  const nextEntries = state.editingEntryId
+    ? state.entries.map((item) => (item.id === entry.id ? entry : item))
+    : [entry, ...state.entries];
+
+  try {
+    saveJson(STORAGE_KEYS.entries, nextEntries);
+  } catch (err) {
+    if (err && (err.name === "QuotaExceededError" || err.code === 22)) {
+      showSaveError(
+        "Couldn't save — browser storage is full. The photo is likely too large. Try a smaller photo, remove the attachment, or export and clear older entries."
+      );
+    } else {
+      showSaveError("Couldn't save entry. " + (err && err.message ? err.message : "Unknown error."));
+    }
+    return;
   }
 
-  saveJson(STORAGE_KEYS.entries, state.entries);
+  state.entries = nextEntries;
+  clearSaveError();
   resetEntryForm();
   renderEntries();
+}
+
+function showSaveError(message) {
+  elements.saveError.textContent = message;
+  elements.saveError.hidden = false;
+}
+
+function clearSaveError() {
+  elements.saveError.textContent = "";
+  elements.saveError.hidden = true;
 }
 
 function handleDeferredNotesDetection() {
@@ -368,7 +424,7 @@ function handleDetectFromNotes() {
   const extracted = extractEntryFieldsFromTranscript(transcript);
   const applied = applyExtractedFields(extracted);
 
-  const tidied = buildConciseVoiceNotes(transcript);
+  const tidied = buildConciseVoiceNotes(extracted.scrubbedText);
   if (tidied && tidied !== currentValue) {
     elements.entryNotes.value = tidied;
     state.lastTidiedNotesValue = tidied;
@@ -480,6 +536,7 @@ function resetEntryForm() {
   clearDetectedPreview();
   hideSubjectConfirmPrompt();
   renderDurationCustomSelect();
+  clearSaveError();
   clearDraft();
 }
 
