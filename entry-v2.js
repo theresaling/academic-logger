@@ -672,12 +672,61 @@ function renderCaptured() {
   `;
 }
 
-function renderSavedStub() {
-  const c = SUBJECT_COLORS[state.subject] || { c: "var(--accent)" };
+function renderSaved() {
+  const meta = subjectMeta(state.subject);
+  const streak = state.streak;
+  const segments = Array.from({ length: 7 }, (_, i) =>
+    `<div class="pop-streak-seg ${i < streak ? "pop-streak-seg-filled" : ""}"></div>`
+  ).join("");
+  const remaining = Math.max(0, 7 - streak);
+  const streakSubLine =
+    streak >= 7 ? "a full week 🎉" : `${remaining} more for a week`;
+  const subLine =
+    streak === 0
+      ? ""
+      : streak === 1
+      ? `<div class="pop-saved-sub">Nice. That's a fresh streak.</div>`
+      : `<div class="pop-saved-sub">Nice. That's ${streak} days in a row.</div>`;
+
+  // 5 confetti dots positioned around the 116px check
+  const confetti = [
+    { x: -22, y: -8, c: "var(--pop-yellow)", s: 8, delay: 0.15 },
+    { x: 130, y: 18, c: SUBJECT_COLORS.Reading.c, s: 6, delay: 0.21 },
+    { x: -18, y: 90, c: SUBJECT_COLORS.Art.c, s: 7, delay: 0.27 },
+    { x: 128, y: 100, c: SUBJECT_COLORS.Music.c, s: 5, delay: 0.33 },
+    { x: 56, y: -30, c: SUBJECT_COLORS.Science.c, s: 6, delay: 0.39 },
+  ]
+    .map(
+      (d, i) => `
+      <div class="pop-confetti" style="
+        left:${d.x}px;top:${d.y}px;width:${d.s}px;height:${d.s}px;
+        background:${d.c};transform:rotate(${i * 25}deg);
+        animation-delay:${d.delay}s;"></div>`
+    )
+    .join("");
+
   return `
-    <div class="pop-saved-stub">
-      <div class="pop-saved-check">${CheckIcon(48)}</div>
-      <h2 class="pop-saved-title">Logged · <span style="color:${c.c}">${state.subject}</span> · ${state.duration}m</h2>
+    <div class="pop-saved">
+      <div class="pop-saved-body">
+        <div class="pop-check-wrap">
+          <div class="pop-saved-check">${CheckIcon(56)}</div>
+          ${confetti}
+        </div>
+        <div class="pop-saved-headline">
+          <h2 class="pop-saved-title">Logged · <span style="color:${meta.c}">${escapeHtml(meta.name)}</span> · ${state.duration}m</h2>
+          ${subLine}
+        </div>
+        <div class="pop-streak-card">
+          <div class="pop-streak-card-head">
+            <div class="pop-streak-card-title">
+              <span class="pop-streak-card-title-dot">●</span>
+              Streak — ${streak} ${streak === 1 ? "day" : "days"}
+            </div>
+            <div class="pop-streak-card-sub">${streakSubLine}</div>
+          </div>
+          <div class="pop-streak-segments">${segments}</div>
+        </div>
+      </div>
       <div class="pop-saved-buttons">
         <button class="pop-btn-soft" data-action="see-history">See history</button>
         <button class="pop-btn-ink" data-action="log-another">Log another</button>
@@ -696,14 +745,175 @@ function renderEntryTab() {
     case "captured":
       return renderCaptured();
     case "saved":
-      return renderSavedStub();
+      return renderSaved();
     default:
       return renderIdle();
   }
 }
 
 function renderHistoryTab() {
-  return `<div class="pop-stub"><strong>History</strong>coming in Milestone 3</div>`;
+  const grouped = groupEntriesByDay(state.entries);
+  const weekMins = sumWeekMinutes(state.entries);
+
+  const stats = `
+    <div class="pop-stats">
+      <div class="pop-stat-card pop-stat-soft">
+        <div class="pop-stat-eyebrow">This week</div>
+        <div class="pop-stat-value">${formatMinutes(weekMins) || "0m"}</div>
+      </div>
+      <div class="pop-stat-card pop-stat-ink">
+        <div class="pop-stat-eyebrow">Streak</div>
+        <div class="pop-stat-value">${state.streak}<span class="pop-stat-value-unit">${state.streak === 1 ? "day" : "days"}</span></div>
+      </div>
+    </div>
+  `;
+
+  if (grouped.length === 0) {
+    return `
+      <div class="pop-history">
+        ${stats}
+        <div class="pop-history-empty">
+          <div class="pop-history-empty-title">No entries yet</div>
+          <div class="pop-history-empty-sub">Tap the mic on the Entry tab to log one.</div>
+        </div>
+      </div>
+      <button class="pop-fab" data-action="fab-mic" aria-label="Record new entry">${MicFilled(26)}</button>
+    `;
+  }
+
+  const groups = grouped
+    .map(
+      (g) => `
+      <div class="pop-day-group">
+        <div class="pop-day-eyebrow">${dayLabel(g.date)}</div>
+        ${g.items.map(renderEntryCard).join("")}
+      </div>`
+    )
+    .join("");
+
+  return `
+    <div class="pop-history">
+      ${stats}
+      ${groups}
+      <div style="height:80px;flex-shrink:0"></div>
+    </div>
+    <button class="pop-fab" data-action="fab-mic" aria-label="Record new entry">${MicFilled(26)}</button>
+  `;
+}
+
+function renderEntryCard(entry) {
+  const meta = subjectMeta(entry.subject);
+  const ts = entryTimestamp(entry);
+  const time = ts ? formatTime12(ts) : "";
+  const note = entry.notes || "";
+  const photo = entry.photoDataUrl
+    ? `<img class="pop-entry-photo" src="${entry.photoDataUrl}" alt=""/>`
+    : "";
+  const glyph = meta.glyph
+    ? meta.glyph(24)
+    : `<span style="font-size:18px;color:${meta.c};font-weight:800">●</span>`;
+  return `
+    <div class="pop-entry-card">
+      <div class="pop-entry-badge" style="background:${meta.s};color:${meta.c}">${glyph}</div>
+      <div class="pop-entry-main">
+        <div class="pop-entry-meta">
+          <span class="pop-entry-subject" style="color:${meta.c}">${escapeHtml(meta.name)}</span>
+          <span class="pop-entry-duration">· ${entry.duration}m</span>
+          ${time ? `<span class="pop-entry-time">${time}</span>` : ""}
+        </div>
+        <div class="pop-entry-note">${escapeHtml(note) || "<span style=\"color:var(--mute);font-style:italic\">No note added.</span>"}</div>
+      </div>
+      ${photo}
+    </div>
+  `;
+}
+
+// ─── Subject display mapping ────────────────────────────────────────
+// Map legacy "Language Arts" entries to display as "Reading" with the
+// Reading color palette. Other custom subjects render with a neutral
+// muted palette and a dot instead of a glyph.
+function subjectMeta(name) {
+  const displayName = name === "Language Arts" ? "Reading" : name;
+  if (SUBJECT_COLORS[displayName]) {
+    return {
+      name: displayName,
+      c: SUBJECT_COLORS[displayName].c,
+      s: SUBJECT_COLORS[displayName].s,
+      glyph: Glyphs[displayName],
+    };
+  }
+  return {
+    name: name || "Subject",
+    c: "var(--ink-soft)",
+    s: "var(--surface)",
+    glyph: null,
+  };
+}
+
+// ─── History helpers ────────────────────────────────────────────────
+function entryTimestamp(entry) {
+  if (entry.createdAt) return new Date(entry.createdAt);
+  if (entry.date) return new Date(`${entry.date}T12:00:00`);
+  return null;
+}
+
+function entryDayKey(entry) {
+  const ts = entryTimestamp(entry);
+  if (!ts) return "";
+  return toIsoLocal(ts);
+}
+
+function groupEntriesByDay(entries) {
+  const byKey = new Map();
+  [...entries]
+    .sort((a, b) => {
+      const ta = entryTimestamp(a)?.getTime() ?? 0;
+      const tb = entryTimestamp(b)?.getTime() ?? 0;
+      return tb - ta;
+    })
+    .forEach((e) => {
+      const k = entryDayKey(e);
+      if (!byKey.has(k)) byKey.set(k, { date: entryTimestamp(e), key: k, items: [] });
+      byKey.get(k).items.push(e);
+    });
+  return [...byKey.values()];
+}
+
+function sumWeekMinutes(entries) {
+  const now = Date.now();
+  const wk = 7 * 24 * 60 * 60 * 1000;
+  return entries
+    .filter((e) => {
+      const ts = entryTimestamp(e);
+      return ts && now - ts.getTime() < wk;
+    })
+    .reduce((s, e) => s + (Number(e.duration) || 0), 0);
+}
+
+function formatMinutes(m) {
+  if (!m) return "";
+  return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+}
+
+function dayLabel(date) {
+  if (!date) return "";
+  const d = new Date(date);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dx = new Date(d);
+  dx.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - dx.getTime()) / 86400000);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Yesterday";
+  if (diff > 1 && diff < 7) return d.toLocaleDateString("en-US", { weekday: "long" });
+  return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+}
+
+function formatTime12(date) {
+  return new Date(date).toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 function renderSettingsSheet() {
@@ -729,7 +939,7 @@ function renderToast() {
 function render() {
   const body = state.tab === "entry" ? renderEntryTab() : renderHistoryTab();
   root.innerHTML = `
-    <div class="pop-preview-banner">Preview · Pop redesign · Milestone 2</div>
+    <div class="pop-preview-banner">Preview · Pop redesign · Milestone 3</div>
     ${renderTopNav()}
     <div class="pop-screen">${body}</div>
     ${renderSettingsSheet()}
@@ -825,6 +1035,12 @@ root.addEventListener("click", (event) => {
     state.tab = "history";
     resetEntry();
     render();
+    return;
+  }
+  if (action === "fab-mic") {
+    state.tab = "entry";
+    resetEntry();
+    startListening();
     return;
   }
 });
