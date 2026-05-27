@@ -219,6 +219,445 @@ button {
   background: var(--pop-yellow);
 }
 
+/* ─── LISTENING screen ────────────────────────────────────────────── */
+.pop-listen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px 0;
+  gap: 12px;
+  min-height: 0;
+}
+.pop-listen-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--accent);
+  border: 0;
+  border-radius: 18px;
+  color: #fff;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.pop-listen-bar-mic {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.pop-listen-bar-text {
+  flex: 1;
+  line-height: 1.15;
+}
+.pop-listen-bar-title {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pop-listen-bar-sub {
+  font-size: 12px;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.pop-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: currentColor;
+  display: inline-block;
+  animation: pop-live-pulse 1s ease-in-out infinite;
+}
+.pop-wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.pop-wave span {
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
+  animation: pop-live-pulse 1s ease-in-out infinite;
+}
+.pop-transcript {
+  flex: 1;
+  background: var(--surface-soft);
+  border-radius: 22px;
+  padding: 18px;
+  overflow: auto;
+  min-height: 0;
+}
+.pop-transcript-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin-bottom: 10px;
+}
+.pop-transcript-body {
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.005em;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.pop-transcript-empty {
+  color: var(--mute);
+  font-style: italic;
+}
+.pop-caret {
+  display: inline-block;
+  width: 2.5px;
+  height: 1.05em;
+  background: var(--accent);
+  vertical-align: -3px;
+  margin-left: 3px;
+  border-radius: 1px;
+  animation: pop-caret 1s steps(2) infinite;
+}
+.pop-listen-hint {
+  padding: 12px 22px 18px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--mute);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ─── CAPTURED screen ─────────────────────────────────────────────── */
+.pop-cap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 18px 0;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+}
+.pop-gotit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-radius: 18px;
+}
+.pop-gotit-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.pop-gotit-text {
+  flex: 1;
+}
+.pop-gotit-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.pop-gotit-sub {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 1px;
+}
+.pop-rerec {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--ink-soft);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.pop-note-card {
+  background: #fff;
+  border: 1.5px solid var(--border);
+  border-radius: 22px;
+  padding: 16px 18px;
+  min-height: 100px;
+  font-size: 15.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+}
+.pop-note-card p,
+.pop-note-card ul {
+  margin: 0;
+}
+.pop-note-card ul {
+  padding-left: 18px;
+}
+.pop-note-card li {
+  margin-bottom: 4px;
+}
+.pop-note-empty {
+  color: var(--mute);
+  font-style: italic;
+}
+.pop-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px 8px 10px;
+  border: 0;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.pop-chip-empty {
+  background: transparent;
+  border: 1.5px dashed var(--mute);
+  color: var(--mute);
+  padding: 7px 14px;
+  font-weight: 600;
+}
+.pop-chip-edit {
+  margin-left: 2px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+.pop-chip-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  object-fit: cover;
+  margin-right: -2px;
+}
+.pop-pulse {
+  animation: pop-detected-pulse 1.2s ease-out 2;
+}
+/* Editor panels (slide-up under chips) */
+.pop-editor {
+  background: var(--surface-soft);
+  border-radius: 18px;
+  padding: 14px;
+  animation: pop-slide-up 0.22s ease both;
+}
+.pop-editor-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.pop-editor-label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.pop-editor-done {
+  background: transparent;
+  border: 0;
+  color: var(--accent-deep);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.pop-subj-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 4px 2px 8px;
+  margin: 0 -2px;
+}
+.pop-subj-scroll::-webkit-scrollbar {
+  display: none;
+}
+.pop-subj-tile {
+  flex-shrink: 0;
+  width: 76px;
+  height: 80px;
+  border-radius: 16px;
+  border: 1.5px solid var(--border);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  padding: 0;
+}
+.pop-subj-tile-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.pop-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px;
+}
+.pop-step-btn {
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  border: 0;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.pop-step-btn[disabled] {
+  background: var(--surface);
+  color: var(--mute);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.pop-step-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.pop-step-num {
+  font-size: 44px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.pop-step-unit {
+  font-size: 16px;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.pop-step-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--mute);
+  font-weight: 600;
+  margin-top: 4px;
+}
+.pop-save-wrap {
+  padding: 12px 18px calc(18px + env(safe-area-inset-bottom));
+  flex-shrink: 0;
+}
+.pop-save-btn {
+  width: 100%;
+  height: 58px;
+  border-radius: 20px;
+  border: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(242, 84, 45, 0.25);
+}
+.pop-save-btn[disabled] {
+  background: var(--surface);
+  color: var(--mute);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Toast (used for save errors) */
+.pop-toast {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  z-index: 50;
+  animation: pop-slide-up 0.22s ease both;
+}
+
+/* M2 simple saved confirmation (M3 will replace with the full screen) */
+.pop-saved-stub {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 22px;
+  text-align: center;
+  gap: 20px;
+}
+.pop-saved-check {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 18px 38px rgba(242, 84, 45, 0.25);
+  animation: pop-pop 0.4s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+.pop-saved-title {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  margin: 0;
+}
+.pop-saved-buttons {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+.pop-saved-buttons button {
+  flex: 1;
+  height: 54px;
+  border-radius: 18px;
+  border: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pop-btn-soft {
+  background: var(--surface);
+  color: var(--ink);
+}
+.pop-btn-ink {
+  background: var(--ink);
+  color: #fff;
+}
+
 /* ─── Stub screens (M1 placeholders) ──────────────────────────────── */
 .pop-stub {
   flex: 1;
