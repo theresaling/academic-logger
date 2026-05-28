@@ -5,6 +5,11 @@ import { STORAGE_KEYS, loadJson, saveJson, todayIso } from "./data-service.js";
 
 const root = document.querySelector("#pop-root");
 const photoInput = document.querySelector("#pop-photo-input");
+const importInput = document.querySelector("#pop-import-input");
+
+// Settings keys that aren't part of data-service's existing schema.
+const DEMO_MODE_KEY = "popLogger.demoMode";
+const DEFAULT_SUBJECTS = ["Math", "Language Arts", "Science", "Art"];
 
 // ─── Subject palette (matches design tokens in pop.css) ─────────────
 const POP_SUBJECTS = ["Math", "Reading", "Writing", "Art", "Science", "Music"];
@@ -37,6 +42,7 @@ const state = {
   phase: "idle", // idle | listening | processing | captured | saved
   settingsOpen: false,
   entries: loadJson(STORAGE_KEYS.entries, []),
+  links: loadJson(STORAGE_KEYS.links, []),
   streak: 0,
   // Capture-in-progress
   transcript: "",
@@ -49,6 +55,11 @@ const state = {
   justDetected: null,
   listeningTimer: 0,
   toast: null,
+  // Settings
+  demoMode: loadJson(DEMO_MODE_KEY, false) === true,
+  backupStatus: "",
+  // New-link form
+  newLink: { name: "", url: "", notes: "" },
 };
 
 state.streak = computeStreak(state.entries);
@@ -56,7 +67,46 @@ state.streak = computeStreak(state.entries);
 let timerInterval = null;
 let pulseTimeout = null;
 let toastTimeout = null;
+let demoCancel = null;
 const recognizer = setupRecognizer();
+
+// Demo-mode canned recording — progressively reveals a transcript over ~7s
+// without using the real mic. Useful for showcasing the flow.
+const DEMO_SCRIPT = [
+  { t: 0, text: "okay so " },
+  { t: 600, text: "okay so we worked on " },
+  { t: 1200, text: "okay so we worked on math today, " },
+  { t: 1900, text: "okay so we worked on math today, the times tables " },
+  { t: 2700, text: "okay so we worked on math today, the times tables — sixes and sevens. " },
+  { t: 3500, text: "okay so we worked on math today, the times tables — sixes and sevens. Got most of them quick " },
+  { t: 4400, text: "okay so we worked on math today, the times tables — sixes and sevens. Got most of them quick but still stuck on seven times eight. " },
+  { t: 5400, text: "okay so we worked on math today, the times tables — sixes and sevens. Got most of them quick but still stuck on seven times eight. Ended with a flashcard round, " },
+  { t: 6500, text: "okay so we worked on math today, the times tables — sixes and sevens. Got most of them quick but still stuck on seven times eight. Ended with a flashcard round, took about thirty minutes." },
+];
+
+function runDemo() {
+  const timers = [];
+  let cancelled = false;
+  DEMO_SCRIPT.forEach((step) => {
+    timers.push(
+      setTimeout(() => {
+        if (cancelled || state.phase !== "listening") return;
+        state.transcript = step.text;
+        updateTranscriptDom();
+      }, step.t)
+    );
+  });
+  timers.push(
+    setTimeout(() => {
+      if (cancelled || state.phase !== "listening") return;
+      stopListening();
+    }, 7200)
+  );
+  return () => {
+    cancelled = true;
+    timers.forEach(clearTimeout);
+  };
+}
 
 // ─── SVG glyphs ─────────────────────────────────────────────────────
 const svgWrap = (size, body, extra = "") =>
@@ -187,14 +237,17 @@ function startListening() {
   state.justDetected = null;
   state.listeningTimer = 0;
 
-  if (recognizer) {
+  if (state.demoMode) {
+    if (demoCancel) demoCancel();
+    demoCancel = runDemo();
+  } else if (recognizer) {
     try {
       recognizer.start();
     } catch {
       // Recognizer can throw if already started — safe to ignore.
     }
   } else {
-    showToast("Voice input isn't supported in this browser. You can still type a note after stopping.");
+    showToast("Voice input isn't supported in this browser. Flip on Demo mode in Settings to try the flow.");
   }
 
   if (timerInterval) clearInterval(timerInterval);
@@ -210,6 +263,14 @@ function stopListening() {
   if (timerInterval) {
     clearInterval(timerInterval);
     timerInterval = null;
+  }
+  if (state.demoMode) {
+    if (demoCancel) {
+      demoCancel();
+      demoCancel = null;
+    }
+    processTranscript();
+    return;
   }
   if (recognizer) {
     try {
@@ -296,14 +357,52 @@ function clampDuration(minutes) {
 function cleanNote(transcript) {
   if (!transcript) return "";
   let t = transcript.trim();
-  // Strip leading filler.
+  // Strip leading filler ("okay so", "um", "well", "alright").
   t = t.replace(/^(okay so|ok so|so |um |uh |well |alright |all right )+/gi, "");
   // Strip filler words mid-sentence.
   t = t.replace(/\b(uh|um|like,?)\s+/gi, "");
-  // Collapse whitespace.
+  // Strip subject/duration mentions so they don't double up with the chips.
+  t = t.replace(/\b(\d+)\s*(min|minute|mins|minutes)\b/gi, "");
+  t = t.replace(/\bfor\s+(five|ten|fifteen|twenty|thirty|forty|fifty|sixty|an? hour|half an? hour)\b/gi, "");
+  t = t.replace(/\bhalf\s*an?\s*hour\b/gi, "");
+  // Collapse whitespace and stray punctuation left over from substitutions.
+  t = t.replace(/\s+([,.:;!?])/g, "$1");
   t = t.replace(/\s+/g, " ").trim();
+  t = t.replace(/[,;:\s]+$/g, "");
   if (!t) return "";
-  return t.charAt(0).toUpperCase() + t.slice(1);
+
+  // Bullet-ize long transcripts by splitting on conjunctions.
+  const SHORT_THRESHOLD = 25; // words
+  const wordCount = t.split(/\s+/).length;
+  if (wordCount > SHORT_THRESHOLD) {
+    const segments = splitOnConjunctions(t);
+    if (segments.length >= 2) {
+      return segments
+        .map((seg) => `- ${sentenceCase(seg)}`)
+        .join("\n");
+    }
+  }
+
+  return sentenceCase(t);
+}
+
+// Split a flat dictated sentence into chunks on common conjunctions.
+// Tries to be conservative — only splits if the resulting chunks are
+// each at least 4 words, so we don't shred a short sentence.
+function splitOnConjunctions(text) {
+  const re = /\s+(?:and then|then|so|next|after that|but)\s+/gi;
+  const parts = text
+    .split(re)
+    .map((s) => s.trim().replace(/[,.;:]+$/g, "").trim())
+    .filter(Boolean);
+  if (parts.length < 2) return [text];
+  if (parts.some((p) => p.split(/\s+/).length < 4)) return [text];
+  return parts;
+}
+
+function sentenceCase(value) {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 // ─── Save / streak ──────────────────────────────────────────────────
@@ -393,6 +492,128 @@ function compressImageDataUrl(dataUrl, maxDim = 1024, quality = 0.8) {
     img.src = dataUrl;
   });
 }
+
+// ─── Backup / restore / clear ───────────────────────────────────────
+function setBackupStatus(message) {
+  state.backupStatus = message;
+  render();
+}
+
+async function exportData() {
+  try {
+    const payload = {
+      schemaVersion: 1,
+      exportedAt: new Date().toISOString(),
+      data: {
+        entries: loadJson(STORAGE_KEYS.entries, []),
+        subjects: loadJson(STORAGE_KEYS.subjects, DEFAULT_SUBJECTS),
+        links: loadJson(STORAGE_KEYS.links, []),
+      },
+    };
+    const json = JSON.stringify(payload, null, 2);
+    const fileName = `academic-logger-backup-${todayIso()}.json`;
+    const blob = new Blob([json], { type: "application/json" });
+
+    if (navigator.canShare && navigator.share) {
+      const file = new File([blob], fileName, { type: "application/json" });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: "Academic Logger Backup",
+          text: "Backup file for Academic Practice Logger",
+          files: [file],
+        });
+        setBackupStatus("Backup shared. Save it to Files/iCloud/Drive so you can import on another device.");
+        return;
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setBackupStatus("Backup downloaded. Save it somewhere you can access on your other device.");
+  } catch (err) {
+    setBackupStatus("Export failed. Try again, or check browser permissions.");
+  }
+}
+
+function isValidBackupPayload(payload) {
+  if (!payload || typeof payload !== "object") return false;
+  if (payload.schemaVersion !== 1) return false;
+  if (!payload.data || typeof payload.data !== "object") return false;
+  if (!Array.isArray(payload.data.entries)) return false;
+  if (!Array.isArray(payload.data.subjects)) return false;
+  if (!Array.isArray(payload.data.links)) return false;
+  return true;
+}
+
+async function importDataFile(file) {
+  try {
+    const text = await file.text();
+    const payload = JSON.parse(text);
+    if (!isValidBackupPayload(payload)) {
+      setBackupStatus("That file doesn't look like an Academic Logger backup.");
+      return;
+    }
+    const ok = window.confirm(
+      "Importing will replace this device's current entries, subjects, and links. Continue?"
+    );
+    if (!ok) {
+      setBackupStatus("Import cancelled.");
+      return;
+    }
+    saveJson(STORAGE_KEYS.entries, payload.data.entries);
+    saveJson(STORAGE_KEYS.subjects, payload.data.subjects);
+    saveJson(STORAGE_KEYS.links, payload.data.links);
+    state.entries = loadJson(STORAGE_KEYS.entries, []);
+    state.links = loadJson(STORAGE_KEYS.links, []);
+    state.streak = computeStreak(state.entries);
+    setBackupStatus("Import complete. Your data has been restored on this device.");
+  } catch (err) {
+    setBackupStatus("Import failed. Make sure you selected a valid JSON backup file.");
+  }
+}
+
+importInput.addEventListener("change", (event) => {
+  const [file] = event.target.files || [];
+  if (file) importDataFile(file);
+  event.target.value = "";
+});
+
+// ─── Links ──────────────────────────────────────────────────────────
+function handleNewLink() {
+  const { name, url, notes } = state.newLink;
+  if (!name.trim() || !url.trim()) return;
+  const link = {
+    id: crypto.randomUUID(),
+    name: name.trim(),
+    url: url.trim(),
+    notes: notes.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  state.links = [link, ...state.links];
+  saveJson(STORAGE_KEYS.links, state.links);
+  state.newLink = { name: "", url: "", notes: "" };
+  render();
+}
+
+// Track link form input changes without re-rendering (would lose focus).
+root.addEventListener("input", (event) => {
+  const field = event.target.dataset && event.target.dataset.linkField;
+  if (!field) return;
+  state.newLink[field] = event.target.value;
+});
+
+root.addEventListener("submit", (event) => {
+  const form = event.target.closest && event.target.closest("[data-form='new-link']");
+  if (!form) return;
+  event.preventDefault();
+  handleNewLink();
+});
 
 photoInput.addEventListener("change", async (event) => {
   const [file] = event.target.files;
@@ -880,14 +1101,24 @@ function groupEntriesByDay(entries) {
 }
 
 function sumWeekMinutes(entries) {
-  const now = Date.now();
-  const wk = 7 * 24 * 60 * 60 * 1000;
+  // Calendar week starting Monday. Resets at midnight Sunday→Monday.
+  const monday = startOfCurrentWeekMonday();
   return entries
     .filter((e) => {
       const ts = entryTimestamp(e);
-      return ts && now - ts.getTime() < wk;
+      return ts && ts.getTime() >= monday.getTime();
     })
     .reduce((s, e) => s + (Number(e.duration) || 0), 0);
+}
+
+function startOfCurrentWeekMonday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  // getDay: 0=Sun, 1=Mon, ... 6=Sat. We want Monday.
+  const day = d.getDay();
+  const diffToMonday = (day + 6) % 7; // Mon=0, Sun=6
+  d.setDate(d.getDate() - diffToMonday);
+  return d;
 }
 
 function formatMinutes(m) {
@@ -918,6 +1149,16 @@ function formatTime12(date) {
 
 function renderSettingsSheet() {
   if (!state.settingsOpen) return "";
+  const entryCount = state.entries.length;
+  const linkCount = state.links.length;
+  const micSupported = recognizer !== null;
+
+  const demoSub = state.demoMode
+    ? "Mic plays a canned recording — great for showing it off."
+    : micSupported
+    ? "Uses your real mic. Tap mic to record (browser will ask for permission)."
+    : "Your browser doesn't support voice — flip this on to try the flow.";
+
   return `
     <div class="pop-sheet-overlay" data-action="close-settings"></div>
     <div class="pop-sheet" role="dialog" aria-label="Settings">
@@ -926,8 +1167,86 @@ function renderSettingsSheet() {
         <h2 class="pop-sheet-title">Settings</h2>
         <button class="pop-sheet-close" data-action="close-settings" aria-label="Close">×</button>
       </div>
-      <div class="pop-sheet-stub">Demo mode, backup &amp; restore, links — coming in Milestone 4.</div>
+
+      <div class="pop-sheet-section">
+        <div class="pop-sheet-card">
+          <div class="pop-sheet-card-row">
+            <div class="pop-setting-text">
+              <div class="pop-setting-title">Demo mode</div>
+              <div class="pop-setting-sub">${escapeHtml(demoSub)}</div>
+            </div>
+            <button class="pop-toggle" data-action="toggle-demo"
+              aria-checked="${state.demoMode}" aria-label="Toggle demo mode"></button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pop-sheet-section">
+        <div class="pop-section-eyebrow">Backup &amp; restore</div>
+        <button class="pop-sheet-btn" data-action="export-data">
+          <div class="pop-setting-text">
+            <div class="pop-setting-title">Export backup</div>
+            <div class="pop-setting-sub">Download a JSON file of your ${entryCount} ${entryCount === 1 ? "entry" : "entries"}, subjects, and links.</div>
+          </div>
+          <span class="pop-sheet-btn-chev">⇣</span>
+        </button>
+        <button class="pop-sheet-btn" data-action="import-data">
+          <div class="pop-setting-text">
+            <div class="pop-setting-title">Import backup</div>
+            <div class="pop-setting-sub">Replace this device's data from a JSON backup file.</div>
+          </div>
+          <span class="pop-sheet-btn-chev">⇡</span>
+        </button>
+        <div class="pop-backup-status">${escapeHtml(state.backupStatus)}</div>
+      </div>
+
+      <div class="pop-sheet-section">
+        <div class="pop-section-eyebrow">Links</div>
+        ${renderLinkList()}
+        ${renderLinkForm()}
+      </div>
+
+      <div class="pop-sheet-section">
+        <button class="pop-sheet-btn pop-sheet-btn-danger" data-action="clear-entries">
+          <div class="pop-setting-text">
+            <div class="pop-setting-title">Clear all entries</div>
+            <div class="pop-setting-sub pop-setting-sub-warn">${entryCount} saved · this can't be undone.</div>
+          </div>
+          <span class="pop-sheet-btn-chev">→</span>
+        </button>
+      </div>
     </div>
+  `;
+}
+
+function renderLinkList() {
+  if (!state.links.length) {
+    return `<div class="pop-link-empty">No links saved. Add dashboards, curriculum pages, anything you want quick access to.</div>`;
+  }
+  const items = state.links
+    .map(
+      (l) => `
+      <div class="pop-link-row">
+        <div class="pop-link-row-main">
+          <span class="pop-link-name">${escapeHtml(l.name)}</span>
+          <a class="pop-link-url" href="${escapeHtml(l.url)}" target="_blank" rel="noreferrer">${escapeHtml(l.url)}</a>
+          ${l.notes ? `<div class="pop-link-notes">${escapeHtml(l.notes)}</div>` : ""}
+        </div>
+        <button class="pop-link-del" data-action="delete-link" data-value="${escapeHtml(l.id)}" aria-label="Delete link">×</button>
+      </div>`
+    )
+    .join("");
+  return `<div class="pop-link-list">${items}</div>`;
+}
+
+function renderLinkForm() {
+  return `
+    <form class="pop-link-form" data-form="new-link" autocomplete="off">
+      <input type="text" placeholder="Name (e.g. Times tables drill)" data-link-field="name" value="${escapeHtml(state.newLink.name)}" required />
+      <input type="url" placeholder="https://…" data-link-field="url" value="${escapeHtml(state.newLink.url)}" required />
+      <textarea placeholder="Notes (optional)" rows="2" data-link-field="notes">${escapeHtml(state.newLink.notes)}</textarea>
+      <button class="pop-link-form-btn" type="submit">Add link</button>
+    </form>
   `;
 }
 
@@ -939,7 +1258,7 @@ function renderToast() {
 function render() {
   const body = state.tab === "entry" ? renderEntryTab() : renderHistoryTab();
   root.innerHTML = `
-    <div class="pop-preview-banner">Preview · Pop redesign · Milestone 3</div>
+    <div class="pop-preview-banner">Preview · Pop redesign · Milestone 4</div>
     ${renderTopNav()}
     <div class="pop-screen">${body}</div>
     ${renderSettingsSheet()}
@@ -1041,6 +1360,41 @@ root.addEventListener("click", (event) => {
     state.tab = "entry";
     resetEntry();
     startListening();
+    return;
+  }
+  if (action === "toggle-demo") {
+    state.demoMode = !state.demoMode;
+    saveJson(DEMO_MODE_KEY, state.demoMode);
+    render();
+    return;
+  }
+  if (action === "export-data") {
+    exportData();
+    return;
+  }
+  if (action === "import-data") {
+    importInput.click();
+    return;
+  }
+  if (action === "clear-entries") {
+    if (state.entries.length === 0) {
+      setBackupStatus("Nothing to clear.");
+      return;
+    }
+    const ok = window.confirm(
+      `Clear all ${state.entries.length} entries? This can't be undone.`
+    );
+    if (!ok) return;
+    state.entries = [];
+    saveJson(STORAGE_KEYS.entries, []);
+    state.streak = 0;
+    setBackupStatus("All entries cleared.");
+    return;
+  }
+  if (action === "delete-link") {
+    state.links = state.links.filter((l) => l.id !== value);
+    saveJson(STORAGE_KEYS.links, state.links);
+    render();
     return;
   }
 });

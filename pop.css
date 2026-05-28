@@ -881,6 +881,216 @@ button {
   z-index: 20;
 }
 
+/* ─── Settings sheet content (M4) ─────────────────────────────────── */
+.pop-sheet {
+  max-height: 80vh;
+  max-height: 80dvh;
+  overflow: auto;
+}
+.pop-sheet-section {
+  margin-bottom: 12px;
+}
+.pop-sheet-card {
+  background: var(--surface-soft);
+  border-radius: 18px;
+  padding: 14px 16px;
+}
+.pop-sheet-card-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pop-setting-text {
+  flex: 1;
+  min-width: 0;
+}
+.pop-setting-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.pop-setting-sub {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 3px;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.pop-setting-sub-warn {
+  color: var(--danger, #b91c1c);
+}
+
+/* iOS-style toggle */
+.pop-toggle {
+  flex-shrink: 0;
+  position: relative;
+  width: 52px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--mute);
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease;
+}
+.pop-toggle[aria-checked="true"] {
+  background: var(--accent);
+}
+.pop-toggle::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.pop-toggle[aria-checked="true"]::after {
+  transform: translateX(22px);
+}
+
+/* Full-width text-buttons inside settings cards */
+.pop-sheet-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: var(--surface-soft);
+  border: 0;
+  border-radius: 18px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  margin-bottom: 8px;
+  color: var(--ink);
+}
+.pop-sheet-btn:hover {
+  background: var(--surface);
+}
+.pop-sheet-btn-chev {
+  color: var(--mute);
+  font-size: 18px;
+}
+.pop-sheet-btn-danger .pop-setting-title {
+  color: var(--accent-deep);
+}
+
+/* Links section */
+.pop-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.pop-link-row {
+  background: var(--surface-soft);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.pop-link-row-main {
+  flex: 1;
+  min-width: 0;
+}
+.pop-link-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  display: block;
+  word-break: break-word;
+}
+.pop-link-url {
+  font-size: 12px;
+  color: var(--accent-deep);
+  text-decoration: none;
+  word-break: break-all;
+  display: block;
+  margin-top: 2px;
+}
+.pop-link-notes {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.pop-link-del {
+  background: transparent;
+  border: 0;
+  color: var(--mute);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+.pop-link-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.pop-link-form input,
+.pop-link-form textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  resize: vertical;
+}
+.pop-link-form input:focus,
+.pop-link-form textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.pop-link-form-btn {
+  align-self: flex-end;
+  background: var(--ink);
+  color: #fff;
+  border: 0;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pop-link-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--mute);
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--surface-soft);
+  border-radius: 14px;
+}
+
+.pop-section-eyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mute);
+  margin: 16px 0 8px;
+}
+
+.pop-backup-status {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  font-weight: 500;
+  margin-top: 6px;
+  padding: 0 4px;
+  min-height: 1.4em;
+}
+
 /* ─── Stub screens (M1 placeholders) ──────────────────────────────── */
 .pop-stub {
   flex: 1;
