@@ -371,10 +371,23 @@ function cleanNote(transcript) {
   t = t.replace(/[,;:\s]+$/g, "");
   if (!t) return "";
 
-  // Bullet-ize long transcripts by splitting on conjunctions.
-  const SHORT_THRESHOLD = 25; // words
+  // 1. Sentence-based bulleting — fires when dictation produced periods.
+  const sentences = t
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (
+    sentences.length >= 2 &&
+    sentences.every((s) => s.split(/\s+/).length >= 3)
+  ) {
+    return sentences
+      .map((s) => `- ${sentenceCase(s.replace(/[.!?]+$/g, ""))}`)
+      .join("\n");
+  }
+
+  // 2. Conjunction-based bulleting for run-on dictation (no periods).
   const wordCount = t.split(/\s+/).length;
-  if (wordCount > SHORT_THRESHOLD) {
+  if (wordCount >= 10) {
     const segments = splitOnConjunctions(t);
     if (segments.length >= 2) {
       return segments
@@ -387,16 +400,26 @@ function cleanNote(transcript) {
 }
 
 // Split a flat dictated sentence into chunks on common conjunctions.
-// Tries to be conservative — only splits if the resulting chunks are
-// each at least 4 words, so we don't shred a short sentence.
+// Two-pass: try multi-word phrases first; fall back to bare " and " if
+// nothing else worked. Requires each chunk to be ≥ 3 words so we don't
+// shred a short sentence into single-word bullets.
 function splitOnConjunctions(text) {
-  const re = /\s+(?:and then|then|so|next|after that|but)\s+/gi;
-  const parts = text
-    .split(re)
+  const phraseRe = /\s+(?:and then|after that|next|then|also|plus|but)\s+/gi;
+  let parts = text
+    .split(phraseRe)
     .map((s) => s.trim().replace(/[,.;:]+$/g, "").trim())
     .filter(Boolean);
+
+  if (parts.length < 2) {
+    // Fall back to bare ", and" / " and ".
+    parts = text
+      .split(/\s*,\s+and\s+|\s+and\s+/gi)
+      .map((s) => s.trim().replace(/[,.;:]+$/g, "").trim())
+      .filter(Boolean);
+  }
+
   if (parts.length < 2) return [text];
-  if (parts.some((p) => p.split(/\s+/).length < 4)) return [text];
+  if (parts.some((p) => p.split(/\s+/).length < 3)) return [text];
   return parts;
 }
 
