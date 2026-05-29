@@ -400,9 +400,10 @@ function cleanNote(transcript) {
 }
 
 // Split a flat dictated sentence into chunks on common conjunctions.
-// Two-pass: try multi-word phrases first; fall back to bare " and " if
-// nothing else worked. Requires each chunk to be ≥ 3 words so we don't
-// shred a short sentence into single-word bullets.
+// Three-pass: multi-word conjunction phrases → bare "and" (with optional
+// trailing punctuation) → capitalized pronouns that almost always mark
+// a missed sentence boundary. Requires each chunk to be ≥ 3 words so we
+// don't shred a short sentence into single-word bullets.
 function splitOnConjunctions(text) {
   const phraseRe = /\s+(?:and then|after that|next|then|also|plus|but)\s+/gi;
   let parts = text
@@ -411,9 +412,21 @@ function splitOnConjunctions(text) {
     .filter(Boolean);
 
   if (parts.length < 2) {
-    // Fall back to bare ", and" / " and ".
+    // Bare "and" — allow optional trailing punctuation (catches "and,"
+    // and "and;" that iOS dictation occasionally produces).
     parts = text
-      .split(/\s*,\s+and\s+|\s+and\s+/gi)
+      .split(/\s+and[,;:]?\s+/gi)
+      .map((s) => s.trim().replace(/[,.;:]+$/g, "").trim())
+      .filter(Boolean);
+  }
+
+  if (parts.length < 2) {
+    // Split on capitalized pronouns that follow a lowercase word.
+    // She/He/They/We/I almost always mark a new clause when they appear
+    // mid-stream, and they don't collide with proper nouns the way a
+    // generic "any capitalized word" rule would.
+    parts = text
+      .split(/(?<=[a-z])\s+(?=(?:She|He|They|We|I)\b)/g)
       .map((s) => s.trim().replace(/[,.;:]+$/g, "").trim())
       .filter(Boolean);
   }
