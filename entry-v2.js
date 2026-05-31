@@ -9,7 +9,27 @@ const importInput = document.querySelector("#pop-import-input");
 
 // Settings keys that aren't part of data-service's existing schema.
 const DEMO_MODE_KEY = "popLogger.demoMode";
+const MIGRATIONS_KEY = "popLogger.migrations.v1";
 const DEFAULT_SUBJECTS = ["Math", "Language Arts", "Science", "Art"];
+
+// ─── One-time migrations (run before state init) ────────────────────
+function runMigrations() {
+  const ran = loadJson(MIGRATIONS_KEY, {});
+  if (!ran.langArtsToReading) {
+    const entries = loadJson(STORAGE_KEYS.entries, []);
+    let changed = false;
+    const migrated = entries.map((e) => {
+      if (e.subject === "Language Arts") {
+        changed = true;
+        return { ...e, subject: "Reading" };
+      }
+      return e;
+    });
+    if (changed) saveJson(STORAGE_KEYS.entries, migrated);
+    saveJson(MIGRATIONS_KEY, { ...ran, langArtsToReading: true });
+  }
+}
+runMigrations();
 
 // ─── Subject palette (matches design tokens in pop.css) ─────────────
 const POP_SUBJECTS = ["Math", "Reading", "Writing", "Art", "Science", "Music"];
@@ -44,6 +64,7 @@ const state = {
   entries: loadJson(STORAGE_KEYS.entries, []),
   links: loadJson(STORAGE_KEYS.links, []),
   streak: 0,
+  selectedDate: todayIso(),
   // Capture-in-progress
   transcript: "",
   finalText: "",
@@ -480,7 +501,7 @@ function saveCurrentEntry() {
   if (!state.subject || !state.duration) return;
   const entry = {
     id: crypto.randomUUID(),
-    date: todayIso(),
+    date: state.selectedDate || todayIso(),
     subject: state.subject,
     duration: state.duration,
     notes: state.note || "",
@@ -515,6 +536,7 @@ function resetEntry() {
   state.editor = null;
   state.justDetected = null;
   state.listeningTimer = 0;
+  state.selectedDate = todayIso();
   state.phase = "idle";
 }
 
@@ -731,14 +753,24 @@ function renderTopNav() {
 }
 
 function renderDateRow() {
+  const today = todayIso();
+  const yest = isoDateMinus(1);
+  const dayBefore = isoDateMinus(2);
   return `
     <div class="pop-daterow">
-      <button class="pop-datepill" aria-pressed="true">Today</button>
-      <button class="pop-datepill" aria-pressed="false">Yest</button>
-      <button class="pop-datepill" aria-pressed="false">2d</button>
+      <button class="pop-datepill" aria-pressed="${state.selectedDate === today}" data-action="set-date" data-value="${today}">Today</button>
+      <button class="pop-datepill" aria-pressed="${state.selectedDate === yest}" data-action="set-date" data-value="${yest}">Yest</button>
+      <button class="pop-datepill" aria-pressed="${state.selectedDate === dayBefore}" data-action="set-date" data-value="${dayBefore}">2d</button>
       <button class="pop-calbtn" aria-label="Pick a date">${CalendarIcon(16)}</button>
     </div>
   `;
+}
+
+function isoDateMinus(daysAgo) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - daysAgo);
+  return toIsoLocal(d);
 }
 
 function renderIdle() {
@@ -1311,7 +1343,6 @@ function renderToast() {
 function render() {
   const body = state.tab === "entry" ? renderEntryTab() : renderHistoryTab();
   root.innerHTML = `
-    <div class="pop-preview-banner">Preview · Pop redesign · Milestone 4</div>
     ${renderTopNav()}
     <div class="pop-screen">${body}</div>
     ${renderSettingsSheet()}
@@ -1447,6 +1478,11 @@ root.addEventListener("click", (event) => {
   if (action === "delete-link") {
     state.links = state.links.filter((l) => l.id !== value);
     saveJson(STORAGE_KEYS.links, state.links);
+    render();
+    return;
+  }
+  if (action === "set-date") {
+    state.selectedDate = value;
     render();
     return;
   }
