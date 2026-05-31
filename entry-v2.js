@@ -311,13 +311,15 @@ function extractFields(transcript) {
 
   // Subject — keyword match, longest first to avoid e.g. "art" inside "artist".
   let subject = null;
+  let matchedKeyword = null;
   for (const s of POP_SUBJECTS) {
-    const hit = SUBJECT_KEYWORDS[s].some((k) => {
+    const hit = SUBJECT_KEYWORDS[s].find((k) => {
       const re = new RegExp(`\\b${k.replace(/\s+/g, "\\s+")}\\b`, "i");
       return re.test(lower);
     });
     if (hit) {
       subject = s;
+      matchedKeyword = hit;
       break;
     }
   }
@@ -343,7 +345,18 @@ function extractFields(transcript) {
   }
   if (duration == null && /\bhalf\s*(an?\s*)?hour\b/.test(lower)) duration = 30;
 
-  const note = cleanNote(transcript);
+  // Scrub the subject and duration mentions from the text the user will
+  // see as the note — they're already represented by the chips above.
+  let scrubbed = transcript;
+  if (matchedKeyword) {
+    const esc = matchedKeyword.replace(/\s+/g, "\\s+");
+    scrubbed = scrubbed
+      .replace(new RegExp(`\\bsubject\\s+(?:is|was)\\s+${esc}\\b\\s*`, "gi"), "")
+      .replace(new RegExp(`\\b${esc}\\s+(?:practice|lesson|session|work|today)\\b\\s*`, "gi"), "")
+      .replace(new RegExp(`\\b${esc}\\b\\s*`, "gi"), "");
+  }
+
+  const note = cleanNote(scrubbed);
 
   return { note, subject, duration };
 }
@@ -361,9 +374,13 @@ function cleanNote(transcript) {
   t = t.replace(/^(okay so|ok so|so |um |uh |well |alright |all right )+/gi, "");
   // Strip filler words mid-sentence.
   t = t.replace(/\b(uh|um|like,?)\s+/gi, "");
-  // Strip subject/duration mentions so they don't double up with the chips.
+  // Strip duration mentions so they don't double up with the chip. Strip
+  // the longest phrase first so leftover "for" / "minutes" don't dangle.
+  t = t.replace(/\bfor\s+\d+\s*(min|minute|mins|minutes)\b/gi, "");
+  t = t.replace(/\bfor\s+(five|ten|fifteen|twenty|thirty|forty|fifty|sixty)\s*(min|minute|mins|minutes)?\b/gi, "");
+  t = t.replace(/\bfor\s+(an?\s*hour|half\s*an?\s*hour)\b/gi, "");
   t = t.replace(/\b(\d+)\s*(min|minute|mins|minutes)\b/gi, "");
-  t = t.replace(/\bfor\s+(five|ten|fifteen|twenty|thirty|forty|fifty|sixty|an? hour|half an? hour)\b/gi, "");
+  t = t.replace(/\b(five|ten|fifteen|twenty|thirty|forty|fifty|sixty)\s+(min|minute|mins|minutes)\b/gi, "");
   t = t.replace(/\bhalf\s*an?\s*hour\b/gi, "");
   // Collapse whitespace and stray punctuation left over from substitutions.
   t = t.replace(/\s+([,.:;!?])/g, "$1");
